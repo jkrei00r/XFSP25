@@ -1,0 +1,291 @@
+"""
+Aircraft Take-Off Performance Calculator (STO Analysis)
+This program calculates and visualizes Short Take-Off (STO) distance requirements
+for different aircraft weights and engine thrust values using numerical integration
+and root-finding methods. The GUI allows users to input parameters and view results
+in an interactive plot.
+"""
+
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import numpy as np
+
+
+class Model:
+    """Handles all mathematical computations and physical calculations"""
+
+    @staticmethod
+    def Simpson(fcn, a, b, npoints=21):
+        """
+        Numerical integration using Simpson's 1/3 rule
+        Args:
+            fcn (callable): Function to integrate
+            a (float): Lower limit of integration
+            b (float): Upper limit of integration
+            npoints (int): Number of evaluation points (must be odd)
+        Returns:
+            float: Numerical approximation of integral
+        """
+        # Ensure odd number of intervals for Simpson's rule accuracy
+        npoints += 1 if npoints % 2 == 0 else 0
+        h = (b - a) / (npoints - 1)  # Step size
+
+        # Initialize estimate with endpoint values
+        est = fcn(a) + fcn(b)
+
+        # Add contributions from odd-indexed points (4x coefficients)
+        for i in range(1, npoints, 2):
+            est += 4 * fcn(a + h * i)
+
+        # Add contributions from even-indexed points (2x coefficients)
+        for i in range(2, npoints - 1, 2):
+            est += 2 * fcn(a + h * i)
+
+        return est * h / 3  # Final multiplier from Simpson's formula
+
+    @staticmethod
+    def STO(Thrust, Weight):
+        """
+        Calculate Short Take-Off (STO) distance using aircraft performance equations
+        Args:
+            Thrust (float): Engine thrust in pounds (lb)
+            Weight (float): Aircraft weight in pounds (lb)
+        Returns:
+            float: Take-off distance in feet, or infinity if calculation fails
+        """
+        try:
+            # Aircraft parameters (fixed for this configuration)
+            S = 1000  # Wing area (ft²)
+            Cl = 2.4  # Lift coefficient
+            Cd = 0.0279  # Drag coefficient
+            rho = 0.002377  # Air density (slug/ft³)
+            gc = 32.2  # Gravitational constant (ft/s²)
+
+            # Calculate intermediate terms for the integral
+            A = gc * (Thrust / Weight)
+            B = (gc / Weight) * (0.5 * S * rho * Cd)
+
+            # Calculate liftoff speed (1.2 × stall speed)
+            b = 1.2 * (Weight / (0.5 * rho * S * Cl)) ** 0.5
+
+            # Check for invalid physical conditions
+            if A - B * b ** 2 <= 0:
+                return float('inf')  # Prevent division by zero
+
+            # Define integrand function: v/(A - Bv²)
+            fcn = lambda v: v / (A - B * v ** 2)
+
+            # Perform numerical integration using Simpson's rule
+            sto_value = Model.Simpson(fcn, 0, b, 201)  # 201 points for accuracy
+            return sto_value
+        except:
+            return float('inf')  # Return infinity for invalid calculations
+
+    @classmethod
+    def compute_STO_curves(cls, weight, current_thrust, num_points=100):
+        """
+        Generate STO curves for three different weights
+        Args:
+            weight (float): Base aircraft weight (lb)
+            current_thrust (float): Reference thrust value (lb)
+            num_points (int): Number of thrust points to evaluate
+        Returns:
+            tuple: (thrusts, sto_original, sto_minus, sto_plus,
+                    weight_orig, weight_minus, weight_plus)
+        """
+        # Create thrust range from 0 to current_thrust + 15,000 lb
+        padding = 15000
+        thrust_min = 0  # Start from minimum thrust
+        thrust_max = current_thrust + padding
+        thrusts = np.linspace(thrust_min, thrust_max, num_points)
+
+        # Calculate weight variations with minimum weight protection
+        weight_orig = max(1000, weight)  # Original weight
+        weight_minus = max(1000, weight - 10000)  # Weight -10,000 lb
+        weight_plus = weight + 10000  # Weight +10,000 lb
+
+        # Calculate STO distances for all thrust/weight combinations
+        sto_original = [cls.STO(T, weight_orig) for T in thrusts]
+        sto_minus = [cls.STO(T, weight_minus) for T in thrusts]
+        sto_plus = [cls.STO(T, weight_plus) for T in thrusts]
+
+        return (thrusts, sto_original, sto_minus, sto_plus,
+                weight_orig, weight_minus, weight_plus)
+
+
+class View(tk.Tk):
+    """GUI interface using Tkinter and Matplotlib following MVC pattern"""
+
+    def __init__(self):
+        """Initialize GUI components and layout"""
+        super().__init__()
+        self.title("Aircraft Take-Off Performance Calculator")
+        self.geometry("1000x800")
+
+        # Initialize controller and model
+        self.controller = Controller(self, Model())
+
+        # Create input panel
+        self._create_input_panel()
+
+        # Initialize plot components
+        self._initialize_plot()
+
+        # Set up window close handler
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def _create_input_panel(self):
+        """Create and layout input widgets"""
+        input_frame = tk.Frame(self)
+        input_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
+
+        # Weight input
+        tk.Label(input_frame, text="Weight (lb):").pack(side=tk.LEFT)
+        self.weight_entry = tk.Entry(input_frame, width=10)
+        self.weight_entry.pack(side=tk.LEFT, padx=5)
+
+        # Thrust input
+        tk.Label(input_frame, text="Thrust (lb):").pack(side=tk.LEFT)
+        self.thrust_entry = tk.Entry(input_frame, width=10)
+        self.thrust_entry.pack(side=tk.LEFT, padx=5)
+
+        # Calculate button
+        self.calculate_btn = tk.Button(
+            input_frame,
+            text="Calculate",
+            command=self.controller.calculate
+        )
+        self.calculate_btn.pack(side=tk.LEFT, padx=10)
+
+    def _initialize_plot(self):
+        """Set up Matplotlib plot area"""
+        self.figure = Figure(figsize=(10, 6), dpi=100)
+        self.ax = self.figure.add_subplot(111)
+
+        # Set up initial plot labels and style
+        self._set_plot_labels()
+
+        # Create canvas widget for embedding plot in Tkinter
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self)
+        self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+
+        # Draw initial empty axes
+        self._draw_initial_axes()
+
+    def _set_plot_labels(self):
+        """Configure plot labels and titles"""
+        self.ax.set_xlabel('Engine Thrust (pounds, lb)', fontweight='bold')
+        self.ax.set_ylabel('Take-Off Distance (feet)', fontweight='bold')
+        self.ax.set_title(
+            'Take-Off Distance vs Engine Thrust Performance\n'
+            '(English Units: lb for thrust, feet for distance)',
+            fontsize=12,
+            pad=20,
+            fontweight='bold'
+        )
+        self.ax.grid(True)
+
+    def _draw_initial_axes(self):
+        """Initialize plot with empty labeled axes"""
+        self.ax.set_xlim(0, 1000)  # Initial dummy x-range
+        self.ax.set_ylim(0, 6000)  # Fixed y-range per requirements
+        self.canvas.draw()
+
+    def get_inputs(self):
+        """
+        Retrieve and validate user inputs
+        Returns:
+            tuple: (weight, thrust) as floats or (None, None) for invalid inputs
+        """
+        try:
+            return (
+                float(self.weight_entry.get()),
+                float(self.thrust_entry.get())
+            )
+        except ValueError:
+            return None, None
+
+    def update_plot(self, thrusts, sto_original, sto_minus, sto_plus,
+                    weight_orig, weight_minus, weight_plus, current_thrust, current_sto):
+        """
+        Update plot with new calculation results
+        Args:
+            thrusts (np.array): Array of thrust values
+            sto_* (list): STO distances for different weight configurations
+            weight_* (float): Actual weights used in calculations
+            current_thrust (float): User-specified thrust value
+            current_sto (float): STO for user-specified thrust/weight
+        """
+        self.ax.clear()
+
+        # Plot all three weight configurations
+        self.ax.plot(thrusts, sto_original, label=f'Weight = {weight_orig:.0f} lb')
+        self.ax.plot(thrusts, sto_minus, label=f'Weight -10k = {weight_minus:.0f} lb')
+        self.ax.plot(thrusts, sto_plus, label=f'Weight +10k = {weight_plus:.0f} lb')
+
+        # Highlight current thrust point
+        self.ax.scatter(
+            [current_thrust],
+            [current_sto],
+            color='red',
+            zorder=5,
+            label=f'Current: {current_thrust:.0f} lb thrust'
+        )
+
+        # Set axis limits
+        x_max = max(thrusts[-1], current_thrust)
+        self.ax.set_xlim(0, x_max + 1000)  # X-axis starts at 0 with padding
+        self.ax.set_ylim(0, 6000)  # Fixed y-range 0-6000 feet
+
+        # Reapply labels and style
+        self._set_plot_labels()
+        self.ax.legend()
+        self.canvas.draw()
+
+    def on_close(self):
+        """Cleanup operations when window is closed"""
+        self.weight_entry.delete(0, tk.END)  # Clear weight input
+        self.thrust_entry.delete(0, tk.END)  # Clear thrust input
+        self.destroy()  # Close window
+
+
+class Controller:
+    """Mediates between View and Model following MVC pattern"""
+
+    def __init__(self, view, model):
+        """
+        Initialize controller
+        Args:
+            view (View): GUI interface instance
+            model (Model): Computational model instance
+        """
+        self.view = view
+        self.model = model
+
+    def calculate(self):
+        """Main calculation workflow"""
+        # Get and validate user inputs
+        weight, thrust = self.view.get_inputs()
+        if weight is None or thrust is None:
+            return  # Silent fail for invalid inputs
+
+        # Generate STO curves from model
+        results = self.model.compute_STO_curves(weight, thrust)
+        (thrusts, sto_orig, sto_minus, sto_plus,
+         w_orig, w_minus, w_plus) = results
+
+        # Calculate current STO value
+        current_sto = self.model.STO(thrust, w_orig)
+
+        # Update view with new data
+        self.view.update_plot(
+            thrusts, sto_orig, sto_minus, sto_plus,
+            w_orig, w_minus, w_plus,
+            thrust, current_sto
+        )
+
+
+if __name__ == "__main__":
+    app = View()
+    app.mainloop()
