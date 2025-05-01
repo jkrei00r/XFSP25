@@ -303,3 +303,5 @@ class Ui_Form(object):
         self.chk_LogY.setText(_translate("Form", "log scale Y"))
         self.chk_LogAccel.setText(_translate("Form", "log scale Y\'\'"))
         self.lbl_Dashpot.setText(_translate("Form", "Suspension Shock Absorber (c1, N*s/m)"))
+
+
