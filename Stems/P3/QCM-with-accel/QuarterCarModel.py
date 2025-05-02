@@ -151,6 +151,8 @@ class CarView:
         self.updateSchematic()
 
 
+
+
 class CarController:
     """Mediates between model and view, handles calculations and optimization"""
 
@@ -339,6 +341,14 @@ class CarController:
 
     def setWidgets(self, w):
         self.chk_IncludeAccel = w
+
+    def getZoom(self):
+        """Get current zoom level from view"""
+        return self.view.getZoom()
+
+    def setZoom(self, zoom):
+        """Update zoom level in view"""
+        self.view.setZoom(zoom)
 
 
 
