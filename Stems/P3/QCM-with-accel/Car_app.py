@@ -92,7 +92,27 @@ class MainWindow(qtw.QWidget, Ui_Form):
 
     def eventFilter(self, obj, event):
         """Handle mouse events for schematic view interaction"""
-        # ... (existing event filter code) ...
+        if obj == self.gv_Schematic.scene():
+            et = event.type()
+
+            # Mouse move events - update coordinates in window title
+            if et == qtc.QEvent.GraphicsSceneMouseMove:
+                scenePos = event.scenePos()
+                self.setWindowTitle(
+                    f"Mouse: x={scenePos.x():.1f}, y={-scenePos.y():.1f}"
+                )
+
+            # Mouse wheel events - handle zoom
+            if et == qtc.QEvent.GraphicsSceneWheel:
+                zoom = self.controller.getZoom()
+                zoom += 0.1 if event.delta() > 0 else -0.1
+                zoom = max(0.1, min(zoom, 2.0))  # Keep zoom between 10% and 200%
+                self.controller.setZoom(zoom)
+
+            # Update schematic visualization
+            self.controller.updateSchematic()
+
+        return super().eventFilter(obj, event)
 
 
 if __name__ == '__main__':
