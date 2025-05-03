@@ -1,5 +1,6 @@
 #region imports
 from OttoDiesel_GUI import Ui_Form
+from Dual import dualCycleController
 from PyQt5 import uic
 import sys
 from PyQt5 import QtWidgets as qtw
@@ -17,6 +18,13 @@ class MainWindow(qtw.QWidget, Ui_Form):
     def __init__(self):
         """MainWindow constructor"""
         super().__init__()
+
+        self.otto = ottoCycleController()
+        self.diesel = dieselCycleController()
+        self.dual = dualCycleController()  # Add dual controller
+        self.controller = self.otto
+        self.someWidgets = []
+
         self.setupUi(self)
         # Main UI code goes here
         self.calculated=False
@@ -32,6 +40,9 @@ class MainWindow(qtw.QWidget, Ui_Form):
         self.btn_Calculate.clicked.connect(self.calcCycle)
         self.cmb_Abcissa.currentIndexChanged.connect(self.doPlot)
         self.cmb_Ordinate.currentIndexChanged.connect(self.doPlot)
+
+        self.cmb_OttoDiesel.addItem("Dual cycle")
+
         self.chk_LogAbcissa.stateChanged.connect(self.doPlot)
         self.chk_LogOrdinate.stateChanged.connect(self.doPlot)
         self.cmb_OttoDiesel.currentIndexChanged.connect(self.selectCycle)
@@ -57,6 +68,17 @@ class MainWindow(qtw.QWidget, Ui_Form):
 
         #show the form
         self.show()
+
+    def selectCycle(self):
+        cycle_text = self.cmb_OttoDiesel.currentText().lower()
+        if 'otto' in cycle_text:
+            self.controller = self.otto
+        elif 'diesel' in cycle_text:
+            self.controller = self.diesel
+        elif 'dual' in cycle_text:
+            self.controller = self.dual
+        self.gb_Input.setTitle(f'Input for Air Standard {self.controller.model.cycleType.capitalize()} Cycle:')
+        self.controller.updateView()
 
     def clamp(self, val, low, high):
         if self.isfloat(val):
