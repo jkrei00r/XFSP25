@@ -107,34 +107,35 @@ class stateProps():
             return b
 
     def ConvertStateData(self, SI=True, mass=False, total=False, n=1.0, MW=1.0, Units=None):
-        UC=Units if Units is not None else units()
+        UC = Units if Units is not None else units()
         UC.set(SI=SI, mass=mass, total=total)
         mCF = 1.0 if SI else UC.CF_Mass
-        TCF = 1.0 if SI else UC.CF_T
-        PCF = 1.0 if SI else UC.CF_P
-        vCF = 1.0 if SI else UC.CF_v  # convert m^3/mol to ft^3/lbmol
-        uCF = 1.0 if SI else UC.CF_e  # cpmvert J/mol to Btu/lbmol
+        TCF = 1.0 if SI else UC.CF_T  # K → R
+        PCF = 1.0 if SI else 0.000145038  # Pa → psi (FIXED HERE)
+        vCF = 1.0 if SI else UC.CF_v  # m³/mol → ft³/lbmol
+        uCF = 1.0 if SI else UC.CF_e  # J/mol → Btu/lbmol
         hCF = 1.0 if SI else UC.CF_e
         sCF = 1.0 if SI else UC.CF_s
-        nCF = 1.0 if SI else UC.CF_n  # convert mol to lbmol
-        if mass:
-            mCF/=MW
-            vCF/=MW
-            uCF/=MW
-            hCF/=MW
-            sCF/=MW
-        elif total:
-            vCF*=n*nCF
-            uCF*=n*nCF
-            hCF*=n*nCF
-            sCF*=n*nCF
+        nCF = 1.0 if SI else UC.CF_n  # mol → lbmol
 
-        self.P*=PCF
-        self.T*=TCF
-        self.h*=hCF
-        self.u*=uCF
-        self.v*=vCF
-        self.s*=sCF
+        if mass:
+            mCF /= MW
+            vCF /= MW
+            uCF /= MW
+            hCF /= MW
+            sCF /= MW
+        elif total:
+            vCF *= n * nCF
+            uCF *= n * nCF
+            hCF *= n * nCF
+            sCF *= n * nCF
+
+        self.P *= PCF  # Now correctly converts Pa → psi
+        self.T *= TCF  # Converts K → R
+        self.h *= hCF
+        self.u *= uCF
+        self.v *= vCF
+        self.s *= sCF
 
     def getVal(self, name='T'):
         n=name.lower()
