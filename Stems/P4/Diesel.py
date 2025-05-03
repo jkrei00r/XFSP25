@@ -49,8 +49,15 @@ class dieselCycleModel():
         #DIESEL MODIFICATION HERE for state 3 calculation
         self.State3=self.air.set(P=self.State2.P, v=self.State2.v*self.Cutoff)
         self.State4=self.air.set(v=self.State1.v, s=self.State3.s)
+
+        print(f"[Debug] T1 = {self.State1.T:.2f} R, P1 = {self.State1.P:.2f} psi")
+        print(f"[Debug] T2 = {self.State2.T:.2f} R (Expected ~1629 R)")
+        print(f"[Debug] γ (cp/cv) at T2 = {self.air.cp(self.State2.T) / self.air.cv(self.State2.T):.2f}")
+        print(f"[Debug] u1 = {self.State1.u:.2f} Btu/lbmol, u2 = {self.State2.u:.2f} Btu/lbmol")
+        print(f"[Debug] h2 = {self.State2.h:.2f} Btu/lbmol, h3 = {self.State3.h:.2f} Btu/lbmol")
+        print(f"[Debug] Moles (n) = {self.air.n:.4f} lbmol")
         
-        self.W_Compression = self.air.n*(self.State2.u-self.State1.u)
+        self.W_Compression = self.air.n * (self.State1.u - self.State2.u)  # Now negative
         self.W_Power = self.air.n*(self.State3.u-self.State3.u+self.State2.P*(self.State2.v*(self.Cutoff-1)))
         self.Q_In = self.air.n*(self.State3.h-self.State2.h)
         self.Q_Out = self.air.n*(self.State4.u-self.State1.u)
@@ -437,3 +444,4 @@ def main():
 if __name__ == "__main__":
     app = qtw.QApplication(sys.argv)
     main()
+
